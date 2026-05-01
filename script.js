@@ -2,6 +2,29 @@ const calendarElement = document.getElementById('calendar');
 const predictionText = document.getElementById('prediction');
 const currentPhaseText = document.getElementById('currentPhaseText');
 
+// --- Custom Modal Logic ---
+const modalOverlay = document.getElementById('customModal');
+const modalMessage = document.getElementById('modalMessage');
+const btnConfirm = document.getElementById('modalConfirm');
+const btnCancel = document.getElementById('modalCancel');
+
+function showModal(message, onConfirm, onCancel) {
+    modalMessage.textContent = message;
+    modalOverlay.classList.add('active');
+    
+    // Using .onclick ensures previous event listeners are overwritten
+    btnConfirm.onclick = () => {
+        modalOverlay.classList.remove('active');
+        if (onConfirm) onConfirm();
+    };
+    
+    btnCancel.onclick = () => {
+        modalOverlay.classList.remove('active');
+        if (onCancel) onCancel();
+    };
+}
+// ---------------------------
+
 let cycles = JSON.parse(localStorage.getItem('periodCycles')) || [];
 
 function saveCycle(selectedDates) {
@@ -115,23 +138,29 @@ const fp = flatpickr(calendarElement, {
             });
 
             if (cycleIndex !== -1) {
-                if (confirm("Do you want to remove this marked cycle?")) {
-                    cycles.splice(cycleIndex, 1); 
-                    localStorage.setItem('periodCycles', JSON.stringify(cycles)); 
-                    updatePrediction();
-                    instance.clear(); 
-                    instance.redraw(); 
-                } else {
-                    instance.clear(); 
-                }
+                showModal("Do you want to remove this marked cycle?", 
+                    () => {
+                        cycles.splice(cycleIndex, 1); 
+                        localStorage.setItem('periodCycles', JSON.stringify(cycles)); 
+                        updatePrediction();
+                        instance.clear(); 
+                        instance.redraw(); 
+                    }, 
+                    () => {
+                        instance.clear(); 
+                    }
+                );
             }
         } 
         else if (selectedDates.length === 2) {
-            if (confirm("Log this date range as a period cycle?")) {
-                saveCycle(selectedDates);
-            } else {
-                instance.clear();
-            }
+            showModal("Log this date range as a period cycle?", 
+                () => {
+                    saveCycle(selectedDates);
+                }, 
+                () => {
+                    instance.clear();
+                }
+            );
         }
     },
     onDayCreate: function(dObj, dStr, fp, dayElem) {
@@ -139,7 +168,6 @@ const fp = flatpickr(calendarElement, {
         date.setHours(0,0,0,0);
         const prediction = calculatePrediction();
         
-        // Helper function to build the pill shapes
         function applyPillShape(currentDate, startDate, endDate) {
             if (startDate.getTime() === endDate.getTime()) {
                 dayElem.classList.add('range-single');
@@ -152,7 +180,6 @@ const fp = flatpickr(calendarElement, {
             }
         }
 
-        // 1. Render Past Logged Periods
         let isLogged = false;
         cycles.forEach(cycle => {
             const start = new Date(cycle.start);
@@ -167,10 +194,9 @@ const fp = flatpickr(calendarElement, {
             }
         });
 
-        if (isLogged) return; // Prevent overwriting logged days with phase colors
+        if (isLogged) return; 
 
         if (prediction) {
-            // Setup strict boundary dates for all calculations
             const lastStart = new Date(prediction.lastStart);
             const nextStart = new Date(prediction.start);
             lastStart.setHours(0,0,0,0);
@@ -197,7 +223,6 @@ const fp = flatpickr(calendarElement, {
             const lutealEnd = new Date(nextStart);
             lutealEnd.setDate(lutealEnd.getDate() - 1);
 
-            // Apply coloring and pill shapes for the future/current phases
             if (date >= nextStart && date <= nextEnd) {
                 dayElem.classList.add('predicted-period');
                 applyPillShape(date, nextStart, nextEnd);
@@ -219,12 +244,14 @@ const fp = flatpickr(calendarElement, {
 });
 
 document.getElementById('clearBtn').addEventListener('click', () => {
-    if(confirm("Are you sure you want to delete all stored cycles? This cannot be undone.")) {
-        cycles = [];
-        localStorage.removeItem('periodCycles');
-        updatePrediction();
-        fp.redraw();
-    }
+    showModal("Are you sure you want to delete all stored cycles? This cannot be undone.", 
+        () => {
+            cycles = [];
+            localStorage.removeItem('periodCycles');
+            updatePrediction();
+            fp.redraw();
+        }
+    );
 });
 
 updatePrediction();
