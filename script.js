@@ -10,7 +10,7 @@ function saveCycle(selectedDates) {
         const end = selectedDates[1];
         
         cycles.push({ start: start.toISOString(), end: end.toISOString() });
-        // Keep them sorted by date
+        // Keep them sorted chronologically by start date
         cycles.sort((a, b) => new Date(a.start) - new Date(b.start));
         
         localStorage.setItem('periodCycles', JSON.stringify(cycles));
@@ -24,33 +24,52 @@ function saveCycle(selectedDates) {
 function calculatePrediction() {
     if (cycles.length === 0) return null;
     
-    const defaultCycleLength = 28;
-    let avgCycle = defaultCycleLength;
+    let avgCycleGap = 28; // Default fallback
+    let avgDuration = 5;  // Default fallback
 
-    // If there is more than 1 cycle, calculate the real average
+    // 1. Calculate Average Period Duration (how many days it lasts)
+    let totalDurationDays = 0;
+    cycles.forEach(cycle => {
+        const s = new Date(cycle.start);
+        const e = new Date(cycle.end);
+        // Add 1 to include both the start and end day in the count
+        totalDurationDays += Math.ceil(Math.abs(e - s) / (1000 * 60 * 60 * 24)) + 1; 
+    });
+    avgDuration = Math.round(totalDurationDays / cycles.length);
+
+    // 2. Calculate Weighted Average for Cycle Gap (Irregularity Tracking)
     if (cycles.length > 1) {
-        let totalDays = 0;
+        let totalWeightedDays = 0;
+        let totalWeights = 0;
+
         for (let i = 1; i < cycles.length; i++) {
-            const prev = new Date(cycles[i-1].start);
-            const curr = new Date(cycles[i].start);
-            const diffTime = Math.abs(curr - prev);
-            totalDays += Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const prevStart = new Date(cycles[i-1].start);
+            const currStart = new Date(cycles[i].start);
+            const diffTime = Math.abs(currStart - prevStart);
+            const cycleLength = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            // The weight increases for more recent cycles
+            const weight = i; 
+            totalWeightedDays += (cycleLength * weight);
+            totalWeights += weight;
         }
-        avgCycle = Math.round(totalDays / (cycles.length - 1));
+        // Divide the weighted total by the sum of all weights
+        avgCycleGap = Math.round(totalWeightedDays / totalWeights);
     }
 
-    // Add average cycle length to the most recent start date
+    // Add the calculated gap to the most recent start date
     const lastStart = new Date(cycles[cycles.length - 1].start);
     const predictedStart = new Date(lastStart);
-    predictedStart.setDate(predictedStart.getDate() + avgCycle);
+    predictedStart.setDate(predictedStart.getDate() + avgCycleGap);
     
-    return predictedStart;
+    return { start: predictedStart, duration: avgDuration };
 }
 
 function updatePrediction() {
-    const nextStart = calculatePrediction();
-    if (nextStart) {
-        predictionText.textContent = nextStart.toDateString();
+    const prediction = calculatePrediction();
+    if (prediction) {
+        // Display the date and add a small note about the expected duration
+        predictionText.innerHTML = `${prediction.start.toDateString()} <br><span style="font-size: 13px; color: #7b7b7b; font-weight: 400;">(Expected length: ${prediction.duration} days)</span>`;
     } else {
         predictionText.textContent = "Log a cycle to start";
     }
@@ -59,20 +78,48 @@ function updatePrediction() {
 // Initialize the Flatpickr Calendar
 const fp = flatpickr(calendarElement, {
     mode: "range",
-    inline: true, // Shows the calendar open permanently
-    onChange: function(selectedDates) {
-        if(selectedDates.length === 2) {
-            if(confirm("Log this date range as a period cycle?")) {
+    inline: true, 
+    onChange: function(selectedDates, dateStr, instance) {
+        // Feature: Delete a logged cycle by clicking on it
+        if (selectedDates.length === 1) {
+            const clickedDate = selectedDates[0];
+            clickedDate.setHours(0,0,0,0);
+            
+            // Check if the clicked date falls within any saved cycle
+            const cycleIndex = cycles.findIndex(cycle => {
+                const start = new Date(cycle.start);
+                const end = new Date(cycle.end);
+                start.setHours(0,0,0,0);
+                end.setHours(0,0,0,0);
+                return clickedDate >= start && clickedDate <= end;
+            });
+
+            if (cycleIndex !== -1) {
+                // If a match is found, prompt to delete
+                if (confirm("Do you want to remove this marked cycle?")) {
+                    cycles.splice(cycleIndex, 1); // Remove it from the array
+                    localStorage.setItem('periodCycles', JSON.stringify(cycles)); // Update storage
+                    updatePrediction();
+                    instance.clear(); 
+                    instance.redraw(); 
+                } else {
+                    instance.clear(); // Deselect if they click cancel
+                }
+            }
+        } 
+        // Feature: Save a new cycle
+        else if (selectedDates.length === 2) {
+            if (confirm("Log this date range as a period cycle?")) {
                 saveCycle(selectedDates);
             } else {
-                fp.clear();
+                instance.clear();
             }
         }
     },
     onDayCreate: function(dObj, dStr, fp, dayElem) {
         const date = dayElem.dateObj;
         
-        // 1. Highlight past logged cycles
+        // Highlight past logged cycles
         cycles.forEach(cycle => {
             const start = new Date(cycle.start);
             const end = new Date(cycle.end);
@@ -84,11 +131,14 @@ const fp = flatpickr(calendarElement, {
             }
         });
 
-        // 2. Highlight predicted next cycle (assuming 5 days long)
-        const nextStart = calculatePrediction();
-        if (nextStart) {
+        // Highlight predicted next cycle
+        const prediction = calculatePrediction();
+        if (prediction) {
+            const nextStart = prediction.start;
             const nextEnd = new Date(nextStart);
-            nextEnd.setDate(nextEnd.getDate() + 4); 
+            // Subtract 1 because the start day counts as day 1
+            nextEnd.setDate(nextEnd.getDate() + prediction.duration - 1); 
+            
             nextStart.setHours(0,0,0,0);
             nextEnd.setHours(0,0,0,0);
             
@@ -99,7 +149,7 @@ const fp = flatpickr(calendarElement, {
     }
 });
 
-// Handle the clear button
+// Handle the clear all button
 document.getElementById('clearBtn').addEventListener('click', () => {
     if(confirm("Are you sure you want to delete all stored cycles? This cannot be undone.")) {
         cycles = [];
@@ -109,5 +159,7 @@ document.getElementById('clearBtn').addEventListener('click', () => {
     }
 });
 
+// Run this once when the page loads
+updatePrediction();
 // Run this once when the page loads
 updatePrediction();
