@@ -1,9 +1,7 @@
-/* Import a clean, modern font */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
 
 body {
     font-family: 'Poppins', sans-serif;
-    /* Soft, aesthetic gradient background */
     background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
     background-image: linear-gradient(to top, #fad0c4 0%, #ffd1ff 100%);
     display: flex;
@@ -15,7 +13,6 @@ body {
     box-sizing: border-box;
 }
 
-/* Glassmorphism Container */
 .container {
     background: rgba(255, 255, 255, 0.6);
     backdrop-filter: blur(12px);
@@ -42,7 +39,6 @@ p {
     margin-bottom: 25px;
 }
 
-/* Customizing the Flatpickr Calendar to match the aesthetic */
 .flatpickr-calendar {
     background: transparent !important;
     box-shadow: none !important;
@@ -50,6 +46,7 @@ p {
     margin: 0 auto;
 }
 
+/* Base Period Indicators */
 .flatpickr-day.logged-period {
     background: #ffc2d1 !important;
     color: #c9184a !important;
@@ -65,7 +62,22 @@ p {
     border-radius: 50% !important;
 }
 
-/* Aesthetic Info Box */
+/* Phase Indicators */
+.flatpickr-day.phase-follicular {
+    background: rgba(226, 236, 245, 0.7) !important; 
+    border-radius: 50% !important;
+}
+
+.flatpickr-day.phase-ovulation {
+    background: rgba(255, 243, 205, 0.8) !important; 
+    border-radius: 50% !important;
+}
+
+.flatpickr-day.phase-luteal {
+    background: rgba(235, 230, 250, 0.7) !important; 
+    border-radius: 50% !important;
+}
+
 .info {
     margin-top: 25px;
     padding: 15px;
@@ -89,7 +101,6 @@ p {
     margin-top: 5px;
 }
 
-/* Soft, rounded button */
 button {
     margin-top: 20px;
     background: #ffb3c6;
