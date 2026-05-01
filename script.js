@@ -2,7 +2,6 @@ const calendarElement = document.getElementById('calendar');
 const predictionText = document.getElementById('prediction');
 const currentPhaseText = document.getElementById('currentPhaseText');
 
-// Fetch stored cycles from local storage or start with an empty array
 let cycles = JSON.parse(localStorage.getItem('periodCycles')) || [];
 
 function saveCycle(selectedDates) {
@@ -11,13 +10,12 @@ function saveCycle(selectedDates) {
         const end = selectedDates[1];
         
         cycles.push({ start: start.toISOString(), end: end.toISOString() });
-        // Keep them sorted chronologically by start date
         cycles.sort((a, b) => new Date(a.start) - new Date(b.start));
         
         localStorage.setItem('periodCycles', JSON.stringify(cycles));
         updatePrediction();
         
-        fp.clear(); // Clear the active selection so custom colors show
+        fp.clear(); 
         fp.redraw();
     }
 }
@@ -25,10 +23,9 @@ function saveCycle(selectedDates) {
 function calculatePrediction() {
     if (cycles.length === 0) return null;
     
-    let avgCycleGap = 28; // Default fallback
-    let avgDuration = 5;  // Default fallback
+    let avgCycleGap = 28; 
+    let avgDuration = 5;  
 
-    // 1. Calculate Average Period Duration
     let totalDurationDays = 0;
     cycles.forEach(cycle => {
         const s = new Date(cycle.start);
@@ -37,7 +34,6 @@ function calculatePrediction() {
     });
     avgDuration = Math.round(totalDurationDays / cycles.length);
 
-    // 2. Calculate Weighted Average for Cycle Gap
     if (cycles.length > 1) {
         let totalWeightedDays = 0;
         let totalWeights = 0;
@@ -48,7 +44,6 @@ function calculatePrediction() {
             const diffTime = Math.abs(currStart - prevStart);
             const cycleLength = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             
-            // The weight increases for more recent cycles
             const weight = i; 
             totalWeightedDays += (cycleLength * weight);
             totalWeights += weight;
@@ -56,7 +51,6 @@ function calculatePrediction() {
         avgCycleGap = Math.round(totalWeightedDays / totalWeights);
     }
 
-    // Add the calculated gap to the most recent start date
     const lastStart = new Date(cycles[cycles.length - 1].start);
     const predictedStart = new Date(lastStart);
     predictedStart.setDate(predictedStart.getDate() + avgCycleGap);
@@ -73,10 +67,8 @@ function updatePrediction() {
     const prediction = calculatePrediction();
     
     if (prediction) {
-        // Display the date and expected duration
         predictionText.innerHTML = `${prediction.start.toDateString()} <br><span style="font-size: 13px; color: #7b7b7b; font-weight: 400;">(Expected length: ${prediction.duration} days)</span>`;
         
-        // Calculate what phase she is in TODAY
         const today = new Date();
         today.setHours(0,0,0,0);
         const lastStart = new Date(prediction.lastStart);
@@ -106,12 +98,10 @@ function updatePrediction() {
     }
 }
 
-// Initialize the Flatpickr Calendar
 const fp = flatpickr(calendarElement, {
     mode: "range",
     inline: true, 
     onChange: function(selectedDates, dateStr, instance) {
-        // Feature: Delete a logged cycle by clicking on it
         if (selectedDates.length === 1) {
             const clickedDate = selectedDates[0];
             clickedDate.setHours(0,0,0,0);
@@ -136,7 +126,6 @@ const fp = flatpickr(calendarElement, {
                 }
             }
         } 
-        // Feature: Save a new cycle
         else if (selectedDates.length === 2) {
             if (confirm("Log this date range as a period cycle?")) {
                 saveCycle(selectedDates);
@@ -147,9 +136,24 @@ const fp = flatpickr(calendarElement, {
     },
     onDayCreate: function(dObj, dStr, fp, dayElem) {
         const date = dayElem.dateObj;
+        date.setHours(0,0,0,0);
         const prediction = calculatePrediction();
         
-        // Highlight past logged cycles
+        // Helper function to build the pill shapes
+        function applyPillShape(currentDate, startDate, endDate) {
+            if (startDate.getTime() === endDate.getTime()) {
+                dayElem.classList.add('range-single');
+            } else if (currentDate.getTime() === startDate.getTime()) {
+                dayElem.classList.add('range-start');
+            } else if (currentDate.getTime() === endDate.getTime()) {
+                dayElem.classList.add('range-end');
+            } else {
+                dayElem.classList.add('range-mid');
+            }
+        }
+
+        // 1. Render Past Logged Periods
+        let isLogged = false;
         cycles.forEach(cycle => {
             const start = new Date(cycle.start);
             const end = new Date(cycle.end);
@@ -158,52 +162,62 @@ const fp = flatpickr(calendarElement, {
             
             if (date >= start && date <= end) {
                 dayElem.classList.add('logged-period');
+                applyPillShape(date, start, end);
+                isLogged = true;
             }
         });
 
+        if (isLogged) return; // Prevent overwriting logged days with phase colors
+
         if (prediction) {
-            const nextStart = new Date(prediction.start);
+            // Setup strict boundary dates for all calculations
             const lastStart = new Date(prediction.lastStart);
-            nextStart.setHours(0,0,0,0);
+            const nextStart = new Date(prediction.start);
             lastStart.setHours(0,0,0,0);
+            nextStart.setHours(0,0,0,0);
 
-            // Color code the current cycle's phases
-            if (date > lastStart && date < nextStart) {
-                const isLoggedPeriod = cycles.some(cycle => {
-                    const s = new Date(cycle.start);
-                    const e = new Date(cycle.end);
-                    s.setHours(0,0,0,0);
-                    e.setHours(0,0,0,0);
-                    return date >= s && date <= e;
-                });
-
-                if (!isLoggedPeriod) {
-                    const daysSinceStart = Math.floor((date - lastStart) / (1000 * 60 * 60 * 24));
-                    const ovulationDay = prediction.gap - 14;
-
-                    if (daysSinceStart < ovulationDay - 2) {
-                        dayElem.classList.add('phase-follicular');
-                    } else if (daysSinceStart >= ovulationDay - 2 && daysSinceStart <= ovulationDay + 1) {
-                        dayElem.classList.add('phase-ovulation');
-                    } else if (daysSinceStart > ovulationDay + 1) {
-                        dayElem.classList.add('phase-luteal');
-                    }
-                }
-            }
-
-            // Highlight predicted next period
             const nextEnd = new Date(nextStart);
             nextEnd.setDate(nextEnd.getDate() + prediction.duration - 1); 
             nextEnd.setHours(0,0,0,0);
-            
+
+            const ovulationDay = prediction.gap - 14;
+
+            const follicularStart = new Date(lastStart);
+            follicularStart.setDate(follicularStart.getDate() + prediction.duration);
+            const follicularEnd = new Date(lastStart);
+            follicularEnd.setDate(follicularEnd.getDate() + ovulationDay - 3);
+
+            const ovulationStart = new Date(lastStart);
+            ovulationStart.setDate(ovulationStart.getDate() + ovulationDay - 2);
+            const ovulationEnd = new Date(lastStart);
+            ovulationEnd.setDate(ovulationEnd.getDate() + ovulationDay + 1);
+
+            const lutealStart = new Date(lastStart);
+            lutealStart.setDate(lutealStart.getDate() + ovulationDay + 2);
+            const lutealEnd = new Date(nextStart);
+            lutealEnd.setDate(lutealEnd.getDate() - 1);
+
+            // Apply coloring and pill shapes for the future/current phases
             if (date >= nextStart && date <= nextEnd) {
                 dayElem.classList.add('predicted-period');
+                applyPillShape(date, nextStart, nextEnd);
+            } 
+            else if (date >= follicularStart && date <= follicularEnd) {
+                dayElem.classList.add('phase-follicular');
+                applyPillShape(date, follicularStart, follicularEnd);
+            }
+            else if (date >= ovulationStart && date <= ovulationEnd) {
+                dayElem.classList.add('phase-ovulation');
+                applyPillShape(date, ovulationStart, ovulationEnd);
+            }
+            else if (date >= lutealStart && date <= lutealEnd) {
+                dayElem.classList.add('phase-luteal');
+                applyPillShape(date, lutealStart, lutealEnd);
             }
         }
     }
 });
 
-// Handle the clear button
 document.getElementById('clearBtn').addEventListener('click', () => {
     if(confirm("Are you sure you want to delete all stored cycles? This cannot be undone.")) {
         cycles = [];
@@ -213,5 +227,4 @@ document.getElementById('clearBtn').addEventListener('click', () => {
     }
 });
 
-// Run this once when the page loads
 updatePrediction();
