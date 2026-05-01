@@ -46,37 +46,30 @@ p {
     margin: 0 auto;
 }
 
-/* Base Period Indicators */
-.flatpickr-day.logged-period {
-    background: #ffc2d1 !important;
-    color: #c9184a !important;
-    border-color: #ffc2d1 !important;
-    border-radius: 50% !important;
-    font-weight: 600;
+/* --- THE PILL SHAPE UPGRADE --- */
+/* Force days to touch each other seamlessly */
+.flatpickr-day {
+    max-width: none !important; 
+    border: none !important;
+    margin: 0 !important;
+    box-shadow: none !important;
 }
 
-.flatpickr-day.predicted-period {
-    background: transparent !important;
-    color: #ff8fab !important;
-    border: 2px dashed #ffb3c6 !important;
-    border-radius: 50% !important;
-}
+/* Shape Classes injected by JavaScript */
+.flatpickr-day.range-start { border-radius: 50px 0 0 50px !important; }
+.flatpickr-day.range-mid { border-radius: 0 !important; }
+.flatpickr-day.range-end { border-radius: 0 50px 50px 0 !important; }
+.flatpickr-day.range-single { border-radius: 50px !important; }
 
-/* Phase Indicators */
-.flatpickr-day.phase-follicular {
-    background: rgba(226, 236, 245, 0.7) !important; 
-    border-radius: 50% !important;
-}
+/* Base Period Colors (Border-radius removed as shapes handle it now) */
+.flatpickr-day.logged-period { background: #ffc2d1 !important; color: #c9184a !important; font-weight: 600; }
+.flatpickr-day.predicted-period { background: #ffe5ec !important; color: #ff8fab !important; font-weight: 600;}
 
-.flatpickr-day.phase-ovulation {
-    background: rgba(255, 243, 205, 0.8) !important; 
-    border-radius: 50% !important;
-}
-
-.flatpickr-day.phase-luteal {
-    background: rgba(235, 230, 250, 0.7) !important; 
-    border-radius: 50% !important;
-}
+/* Phase Colors */
+.flatpickr-day.phase-follicular { background: rgba(226, 236, 245, 0.8) !important; color: #5c7c99 !important; }
+.flatpickr-day.phase-ovulation { background: rgba(255, 243, 205, 0.9) !important; color: #a67c00 !important; }
+.flatpickr-day.phase-luteal { background: rgba(235, 230, 250, 0.8) !important; color: #7a6b99 !important; }
+/* ------------------------------ */
 
 .info {
     margin-top: 25px;
